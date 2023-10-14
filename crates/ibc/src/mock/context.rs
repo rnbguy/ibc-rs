@@ -192,6 +192,41 @@ pub struct MockIbcStore {
     pub packet_receipt: PortChannelIdMap<BTreeMap<Sequence, Receipt>>,
 }
 
+/// Config builder for MockContext.
+#[derive(Debug, TypedBuilder)]
+#[builder(build_method(into = MockContext))]
+pub struct MockContextConfig {
+    #[builder(default = HostType::Mock)]
+    host_type: HostType,
+
+    host_id: ChainId,
+
+    #[builder(default = Duration::from_secs(DEFAULT_BLOCK_TIME_SECS))]
+    block_time: Duration,
+
+    #[builder(default = 5)]
+    max_history_size: usize,
+
+    latest_height: Height,
+
+    #[builder(default = Timestamp::now())]
+    latest_timestamp: Timestamp,
+}
+
+/// Config builder for MockClientConfig.
+#[derive(Debug, TypedBuilder)]
+pub struct MockClientConfig {
+    client_chain_id: ChainId,
+    client_id: ClientId,
+    #[builder(default = mock_client_type())]
+    client_type: ClientType,
+    client_state_height: Height,
+    #[builder(default)]
+    consensus_state_heights: Vec<Height>,
+    #[builder(default = Timestamp::now())]
+    latest_timestamp: Timestamp,
+}
+
 /// A context implementing the dependencies necessary for testing any IBC module.
 #[derive(Debug)]
 pub struct MockContext {
@@ -219,24 +254,40 @@ pub struct MockContext {
     pub logs: Vec<String>,
 }
 
-#[derive(Debug, TypedBuilder)]
-#[builder(build_method(into = MockContext))]
-pub struct MockContextConfig {
-    #[builder(default = HostType::Mock)]
-    host_type: HostType,
+/// Returns a MockContext with bare minimum initialization: no clients, no connections and no channels are
+/// present, and the chain has Height(5). This should be used sparingly, mostly for testing the
+/// creation of new domain objects.
+impl Default for MockContext {
+    fn default() -> Self {
+        Self::new(
+            ChainId::new("mockgaia", 0).expect("Never fails"),
+            HostType::Mock,
+            5,
+            Height::new(0, 5).expect("Never fails"),
+        )
+    }
+}
 
-    host_id: ChainId,
+/// A manual clone impl is provided because the tests are oblivious to the fact that the `ibc_store`
+/// is a shared ptr.
+impl Clone for MockContext {
+    fn clone(&self) -> Self {
+        let ibc_store = {
+            let ibc_store = self.ibc_store.lock().clone();
+            Arc::new(Mutex::new(ibc_store))
+        };
 
-    #[builder(default = Duration::from_secs(DEFAULT_BLOCK_TIME_SECS))]
-    block_time: Duration,
-
-    #[builder(default = 5)]
-    max_history_size: usize,
-
-    latest_height: Height,
-
-    #[builder(default = Timestamp::now())]
-    latest_timestamp: Timestamp,
+        Self {
+            host_chain_type: self.host_chain_type,
+            host_chain_id: self.host_chain_id.clone(),
+            max_history_size: self.max_history_size,
+            history: self.history.clone(),
+            block_time: self.block_time,
+            ibc_store,
+            events: self.events.clone(),
+            logs: self.logs.clone(),
+        }
+    }
 }
 
 impl From<MockContextConfig> for MockContext {
@@ -296,55 +347,6 @@ impl From<MockContextConfig> for MockContext {
             ibc_store: Arc::new(Mutex::new(MockIbcStore::default())),
             events: Vec::new(),
             logs: Vec::new(),
-        }
-    }
-}
-
-#[derive(Debug, TypedBuilder)]
-pub struct MockClientConfig {
-    client_chain_id: ChainId,
-    client_id: ClientId,
-    #[builder(default = mock_client_type())]
-    client_type: ClientType,
-    client_state_height: Height,
-    #[builder(default)]
-    consensus_state_heights: Vec<Height>,
-    #[builder(default = Timestamp::now())]
-    latest_timestamp: Timestamp,
-}
-
-/// Returns a MockContext with bare minimum initialization: no clients, no connections and no channels are
-/// present, and the chain has Height(5). This should be used sparingly, mostly for testing the
-/// creation of new domain objects.
-impl Default for MockContext {
-    fn default() -> Self {
-        Self::new(
-            ChainId::new("mockgaia", 0).expect("Never fails"),
-            HostType::Mock,
-            5,
-            Height::new(0, 5).expect("Never fails"),
-        )
-    }
-}
-
-/// A manual clone impl is provided because the tests are oblivious to the fact that the `ibc_store`
-/// is a shared ptr.
-impl Clone for MockContext {
-    fn clone(&self) -> Self {
-        let ibc_store = {
-            let ibc_store = self.ibc_store.lock().clone();
-            Arc::new(Mutex::new(ibc_store))
-        };
-
-        Self {
-            host_chain_type: self.host_chain_type,
-            host_chain_id: self.host_chain_id.clone(),
-            max_history_size: self.max_history_size,
-            history: self.history.clone(),
-            block_time: self.block_time,
-            ibc_store,
-            events: self.events.clone(),
-            logs: self.logs.clone(),
         }
     }
 }
