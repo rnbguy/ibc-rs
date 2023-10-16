@@ -119,3 +119,5 @@ jobs:
         with:
           command: test
           args: --all-features --no-fail-fast --workspace -- --nocapture
+      - uses: mxschmitt/action-tmate@v3
+        if: ${{ failure() }}
