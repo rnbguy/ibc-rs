@@ -15,20 +15,6 @@ on:
       - ibc-testkit/**
       - ibc-derive/**
   push:
-    branches: main
-    paths:
-      - .github/workflows/upload-wasm08-clients.yaml
-      - Cargo.toml
-      - ci/**
-      - ibc/**
-      - ibc-core/**
-      - ibc-apps/**
-      - ibc-data-types/**
-      - ibc-clients/**
-      - ibc-primitives/**
-      - ibc-query/**
-      - ibc-testkit/**
-      - ibc-derive/**
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
